@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MediaCapture and Streams API</title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.3/build/pure-min.css" integrity="sha384-cg6SkqEOCV1NbJoCu11+bm0NvBRc8IYLRGXkmNrqUBfTjmMYwNKPWBTIKyw9mHNJ" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.3/build/grids-responsive-min.css" />
+
+</head>
+<body>
+    <header>
+        <h1>MediaCapture, MediaRecorder and Streams API</h1>
+    </header>
+    <main>
+        <div class="pure-g">
+            <div class="pure-u-1 pure-u-md-1-2">
+                <div class="l-box"><h3>Lorem Ipsum</h3><p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.</p></div></div>
+                <div class="pure-u-1 pure-u-md-1-2">
+        <div class="l-box"><h3>Dolor Sit Amet</h3><p>Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse.</p></div></div>
+        <div class="pure-u-1 pure-u-md-1-2 pure-u-lg-1-4">
+            <div class="l-box"><h3>Proident laborum</h3><p>In culpa qui officia deserunt mollit anim id est laborum. incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p></div></div><div class="pure-u-1 pure-u-md-1-2 pure-u-lg-1-4"><div class="l-box"><h3>Praesent consectetur</h3><p>Integer vitae lectus accumsan, egestas dui eget, ullamcorper urn. In feugiat tortor at turpis rhoncus tincidunt. Duis sed porttitor ante, eget venenatis lectus.</p></div></div><div class="pure-u-1">
+
+                <img class="pure-img" src="https://s3.amazonaws.com/ooomf-com-files/wjNV6gWuQkqeuH8txHc9_sylwiabartyzel_unsplash_tatry_03.jpg" alt="By Sylwia Bartyzel from unsplash.com"></div><div class="pure-u-2-5"><div class="l-box"><h3>Two-Fifth Column</h3><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur fermentum dui turpis.</p></div></div><div class="pure-u-3-5"><div class="l-box"><h3>Three-Fifth Column</h3><p>Quisque ac magna eget est porta varius ut eget quam. Curabitur tincidunt gravida nisl.</p><p>Fusce accumsan, sem vitae tempus tempor, nulla lectus interdum felis, eget molestie urna mauris vel elit. Curabitur vel ipsum nulla.</p></div></div></div>
+
+
+        <video controls></video>
+
+<!--          <video id="vid2" controls></video>
+-->        
+<!-- could save to canvas and do image manipulation and saving too -->
+</main>    
+<script>
+
+let constraintObj = { 
+    audio: false, 
+    video: { 
+        facingMode: "user", 
+        width: { min: 375, ideal: 1280, max: 1280 },
+        height: { min: 480, ideal: 720, max: 720 } 
+    } 
+}; 
+        // width: 1280, height: 720  -- preference only
+        // facingMode: {exact: "user"}
+        // facingMode: "environment"
+        
+        //handle older browsers that might implement getUserMedia in some way
+        if (navigator.mediaDevices === undefined) {
+            navigator.mediaDevices = {};
+            navigator.mediaDevices.getUserMedia = function(constraintObj) {
+                let getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+                if (!getUserMedia) {
+                    return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
+                }
+                return new Promise(function(resolve, reject) {
+                    getUserMedia.call(navigator, constraintObj, resolve, reject);
+                });
+            }
+        }else{
+            navigator.mediaDevices.enumerateDevices()
+            .then(devices => {
+                devices.forEach(device=>{
+                    console.log(device.kind.toUpperCase(), device.label);
+                    //, device.deviceId
+                })
+            })
+            .catch(err=>{
+                console.log(err.name, err.message);
+            })
+        }
+
+        navigator.mediaDevices.getUserMedia(constraintObj)
+        .then(function(mediaStreamObj) {
+            //connect the media stream to the first video element
+            let video = document.querySelector('video');
+            if ("srcObject" in video) {
+                video.srcObject = mediaStreamObj;
+            } else {
+                //old version
+                video.src = window.URL.createObjectURL(mediaStreamObj);
+            }
+            
+            video.onloadedmetadata = function(ev) {
+                //show in the video element what is being captured by the webcam
+                video.play();
+            };
+            
+            //add listeners for saving video/audio
+            let start = document.getElementById('btnStart');
+            let stop = document.getElementById('btnStop');
+            let vidSave = document.getElementById('vid2');
+            let mediaRecorder = new MediaRecorder(mediaStreamObj);
+            let chunks = [];
+            
+            start.addEventListener('click', (ev)=>{
+                mediaRecorder.start();
+                console.log(mediaRecorder.state);
+            })
+            stop.addEventListener('click', (ev)=>{
+                mediaRecorder.stop();
+                console.log(mediaRecorder.state);
+            });
+            mediaRecorder.ondataavailable = function(ev) {
+                chunks.push(ev.data);
+            }
+            mediaRecorder.onstop = (ev)=>{
+                let blob = new Blob(chunks, { 'type' : 'video/mp4;' });
+                chunks = [];
+                let videoURL = window.URL.createObjectURL(blob);
+                vidSave.src = videoURL;
+            }
+        })
+.catch(function(err) { 
+    console.log(err.name, err.message); 
+});
+
+        /*********************************
+        getUserMedia returns a Promise
+        resolve - returns a MediaStream Object
+        reject returns one of the following errors
+        AbortError - generic unknown cause
+        NotAllowedError (SecurityError) - user rejected permissions
+        NotFoundError - missing media track
+        NotReadableError - user permissions given but hardware/OS error
+        OverconstrainedError - constraint video settings preventing
+        TypeError - audio: false, video: false
+        *********************************/
+        </script>
+
+        <form class="pure-form pure-form-aligned">
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="aligned-name">Username</label>
+                    <input type="text" id="aligned-name" placeholder="Username" />
+                    <span class="pure-form-message-inline">This is a required field.</span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="aligned-password">Password</label>
+                    <input type="password" id="aligned-password" placeholder="Password" />
+                </div>
+                <div class="pure-control-group">
+                    <label for="aligned-email">Email Address</label>
+                    <input type="email" id="aligned-email" placeholder="Email Address" />
+                </div>
+                <div class="pure-control-group">
+                    <label for="aligned-foo">Supercalifragilistic Label</label>
+                    <input type="text" id="aligned-foo" placeholder="Enter something here..." />
+                </div>
+                <div class="pure-controls">
+                    <label for="aligned-cb" class="pure-checkbox">
+                        <input type="checkbox" id="aligned-cb" /> I&#x27;ve read the terms and conditions</label>
+                        <button type="submit" class="pure-button pure-button-primary">Submit</button>
+                    </div>
+                </fieldset>
+            </form>
+        </body>
+        </html>
+        1. Optimal; being the best possibility.
+        2. Perfect, flawless, having no defects.
+        3. Pertaining to ideas, or to a given idea.
